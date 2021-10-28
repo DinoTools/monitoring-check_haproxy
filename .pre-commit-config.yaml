@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: none
+# SPDX-License-Identifier: CC0-1.0
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.0.1
+    hooks:
+      # Forbid files which have a UTF-8 byte-order marker
+      - id: check-byte-order-marker
+      # Require literal syntax when initializing empty or zero Python builtin types
+      - id: check-builtin-literals
+      # Check for files that would conflict in case-insensitive filesystems
+      - id: check-case-conflict
+      # Ensures that (non-binary) executables have a shebang
+      - id: check-executables-have-shebangs
+      # Check for files that contain merge conflict strings
+      - id: check-merge-conflict
+      # Checks for symlinks which do not point to anything
+      - id: check-symlinks
+      # This hook checks yaml files for parseable syntax
+      - id: check-yaml
+      # Detects the presence of private keys
+      - id: detect-private-key
+      # Ensures that a file is either empty, or ends with one newline
+      - id: end-of-file-fixer
+      # Replaces or checks mixed line ending
+      - id: mixed-line-ending
+      # This hook trims trailing whitespace
+      - id: trailing-whitespace
+
+#  # Check for missing licensing and copyright information.
+#  # The REUSE helper tool assists with achieving and confirming REUSE compliance.
+#  # See: https://reuse.software/
+#  - repo: https://github.com/fsfe/reuse-tool
+#    rev: v0.11.1
+#    hooks:
+#      - id: reuse
