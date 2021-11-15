@@ -163,19 +163,7 @@ BEGIN {
 sub _ {return sprintf(shift, @_)}
 
 # Create hash array for holding all configuration variables
-our (%opt, %data, %checks);
-%opt = (
-  'check_frontends' => 1,
-  'check_backends'  => 1,
-  'check_servers'   => 1,
-  'socket'          => '/var/run/haproxy.sock',
-  'debug'           => 0,
-  'defaults'        => undef,
-  'help'            => 0,
-);
-
-# Somewhere to store messages
-our (@critical, @warning);
+our (%data, %checks);
 
 my $mp;
 
