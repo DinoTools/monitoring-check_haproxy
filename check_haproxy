@@ -31,6 +31,10 @@ use IO::Socket::UNIX qw( SOCK_STREAM );
 use Data::Dumper;
 use Scalar::Util qw(looks_like_number);
 
+my $pkg_nagios_available = 0;
+my $pkg_monitoring_available = 0;
+my @g_long_message;
+
 # Configure Program details
 our ($_program, $_version, $_author);
 $_program = 'check_haproxy';
@@ -127,6 +131,33 @@ use constant {
   EXIT_UNKNOWN                  => 3,
 };
 
+use constant {
+  OK         => 0,
+  WARNING    => 1,
+  CRITICAL   => 2,
+  UNKNOWN    => 3,
+};
+
+BEGIN {
+    eval {
+        require Monitoring::Plugin;
+        require Monitoring::Plugin::Functions;
+        $pkg_monitoring_available = 1;
+    };
+    if (!$pkg_monitoring_available) {
+        eval {
+            require Nagios::Plugin;
+            require Nagios::Plugin::Functions;
+            *Monitoring::Plugin:: = *Nagios::Plugin::;
+            $pkg_nagios_available = 1;
+        };
+    }
+    if (!$pkg_monitoring_available && !$pkg_nagios_available) {
+        print("UNKNOWN - Unable to find module Monitoring::Plugin or Nagios::Plugin\n");
+        exit UNKNOWN;
+    }
+}
+
 # Alias _ to sprintf
 sub _ {return sprintf(shift, @_)}
 
@@ -145,40 +176,55 @@ our (%opt, %data, %checks);
 # Somewhere to store messages
 our (@critical, @warning);
 
+my $mp;
+
 sub main {
   my (@overrides);
 
-  GetOptions(
-    'f'       => \$opt{'check_frontends'}, 'frontends!'       => \$opt{'check_frontends'},
-    'b'       => \$opt{'check_backends'},  'backends!'        => \$opt{'check_backends'},
-    's'       => \$opt{'check_servers'},   'servers!'         => \$opt{'check_servers'},
-    'S=s'     => \$opt{'socket'},          'socket=s'         => \$opt{'socket'},
-    'd'       => \$opt{'debug'},           'debug!'           => \$opt{'debug'},
-    'O=s{1,}' => \@overrides,              'overrides=s{1,}'  => \@overrides,
-    'D=s'     => \$opt{'defaults'},        'defaults=s'       => \$opt{'defaults'},
-    '-h'      => \$opt{'help'},            '--help'           => \$opt{'help'},
-  ) or pod2usage(
-    -message => sprintf("%s %s by %s", $_program, $_version, $_author),
-    -exitval => EXIT_UNKNOWN,
-    -verbose => 0);
-
-  pod2usage(
-    -message => sprintf("%s %s by %s", $_program, $_version, $_author),
-    -exitval => EXIT_UNKNOWN,
-    -verbose => 1) if $opt{'help'};
+  $mp = Monitoring::Plugin->new(
+      shortname => "haproxy",
+      usage => "",
+  );
+  $mp->add_arg(
+    spec     => 'backends|f!',
+    help     => '',
+    default  => 1,
+  );
+  $mp->add_arg(
+    spec     => 'debug!',
+    help     => '',
+    default  => 0,
+  );
+  $mp->add_arg(
+    spec     => 'frontends|f!',
+    help     => '',
+    default  => 1,
+  );
+  $mp->add_arg(
+    spec     => 'servers|f!',
+    help     => '',
+    default  => 1,
+  );
+  $mp->add_arg(
+    spec     => 'socket|S=s',
+    help     => '',
+    default  => '/var/run/haproxy.sock',
+  );
+  # overides and defaults
+  $mp->getopts;
 
   my $socket = IO::Socket::UNIX->new(
-    Peer    => $opt{'socket'},
+    Peer    => $mp->opts->socket,
     Type    => SOCK_STREAM,
     Timeout => 1,
-  ) or do_unknown("Cannot connect to socket ".$opt{'socket'}, 1);
+  ) or wrap_exit(UNKNOWN, "Cannot connect to socket ".$opt{'socket'});
 
   %data   = get_data($socket);
   %checks = build_checks(\@overrides);
 
-  check_frontends() if $opt{'check_frontends'};
-  check_backends()  if $opt{'check_backends'};
-  check_servers()   if $opt{'check_servers'};
+  check_frontends() if $mp->opts->frontends;
+  check_backends()  if $mp->opts->backends;
+  check_servers()   if $mp->opts->servers;
 
   my ($frontends, $backends, $servers, $services) = (0,0,0,0);
   my (%servers);
@@ -242,7 +288,7 @@ sub do_critical {
 
 sub do_unknown {
   my ($message) = shift;
-  confess($message) if $opt{'debug'};
+  confess($message) if $mp->opts->debug;
   _report(EXIT_UNKNOWN, $message);
 }
 
@@ -639,6 +685,15 @@ sub check_servers {
       }
     }
   }
+}
+
+sub wrap_exit
+{
+    if($pkg_monitoring_available == 1) {
+        $mp->plugin_exit( @_ );
+    } else {
+        $mp->nagios_exit( @_ );
+    }
 }
 
 # Run the program
