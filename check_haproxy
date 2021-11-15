@@ -25,7 +25,7 @@ use Carp;
 
 # Import Modules
 #use Getopt::Long qw(:config no_ignore_case);
-#use Pod::Usage;
+use Pod::Usage qw(pod2usage);
 use IO::Socket::UNIX qw( SOCK_STREAM );
 use Data::Dumper;
 use Scalar::Util qw(looks_like_number);
@@ -183,37 +183,41 @@ sub main {
   my (@overrides);
 
   $mp = Monitoring::Plugin->new(
-      shortname => "haproxy",
-      usage => "",
-  );
-  $mp->add_arg(
-    spec     => 'backends|f!',
-    help     => '',
-    default  => 1,
+      shortname => $_program,
+      usage     => "Usage: check_haproxy [--defaults (defaults)] [--overrides (1 2 ... n)] \n" .
+                   "                     [--[no]frontends] [--[no]backends] [--[no]servers]\n" .
+                   "                     [--socket (path)] [--help]",
+      version   => $_version,
+      extra     => pod2scalar(),
   );
   $mp->add_arg(
     spec     => 'debug|d!',
-    help     => '',
+    help     => 'Enable/disable debug output',
     default  => 0,
   );
   $mp->add_arg(
+    spec     => 'backends|f!',
+    help     => 'Enable/disable checks for the backends in HAProxy',
+    default  => 1,
+  );
+  $mp->add_arg(
     spec     => 'frontends|f!',
-    help     => '',
+    help     => 'Enable/disable checks for the frontends in HAProxy',
     default  => 1,
   );
   $mp->add_arg(
     spec     => 'servers|f!',
-    help     => '',
+    help     => 'Enable/disable checks for the servers in HAProxy',
     default  => 1,
   );
   $mp->add_arg(
     spec     => 'socket|S=s',
-    help     => '',
+    help     => 'Path to the socket check_haproxy should connect to',
     default  => '/var/run/haproxy.sock',
   );
   $mp->add_arg(
     spec     => 'defaults|D=s',
-    help     => '',
+    help     => 'Set/Override the defaults which will be applied to all checks',
     default  => undef,
   );
   # overides
@@ -711,6 +715,16 @@ sub check_servers {
       }
     }
   }
+}
+
+sub pod2scalar {
+  open my $fh, '>', \my $text;
+  pod2usage(
+    @_,
+    -output  => $fh,
+    -exitval => 'NOEXIT'
+  );
+  $text;
 }
 
 sub wrap_exit
