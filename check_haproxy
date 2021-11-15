@@ -223,7 +223,13 @@ sub main {
     Peer    => $mp->opts->socket,
     Type    => SOCK_STREAM,
     Timeout => 1,
-  ) or wrap_exit(UNKNOWN, "Cannot connect to socket ".$opt{'socket'});
+  ) or wrap_exit(
+    UNKNOWN,
+    sprintf(
+      'Cannot connect to socket %s',
+      $mp->opts->socket
+    )
+  );
 
   %data   = get_data($socket);
   %checks = build_checks(\@overrides);
