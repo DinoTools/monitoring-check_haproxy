@@ -555,23 +555,26 @@ sub check_backends {
     );
 
     my $threshold;
+    my $warning_value;
+    my $critical_value;
     if ($checks{$service}{'state'} eq 'u') {
-      $threshold = Monitoring::Plugin::Threshold->set_thresholds(
-        warning   => "$checks{$service}{'be_warn'}:",
-        critical  => "$checks{$service}{'be_crit'}:"
-      );
+      $warning_value = $checks{$service}{'be_warn'};
+      $critical_value = $checks{$service}{'be_crit'};
     } else {
-      $threshold = Monitoring::Plugin::Threshold->set_thresholds(
-        warning   => sprintf('%i:', $total - $checks{$service}{'be_warn'}),
-        critical  => sprintf('%i:', $total - $checks{$service}{'be_crit'}),
-      );
+      $warning_value = $total - $checks{$service}{'be_warn'};
+      $critical_value = $total - $checks{$service}{'be_crit'};
     }
+    $threshold = Monitoring::Plugin::Threshold->set_thresholds(
+      warning   => sprintf('%i:', $warning_value),
+      critical  => sprintf('%i:', $critical_value),
+    );
 
     $mp->add_perfdata(
         label     => 'backend_' . $service . '_servers_up',
         value     => $up,
         max       => $total,
-        threshold => $threshold,
+        warning   => $warning_value,
+        critical  => $critical_value,
     );
     $mp->add_perfdata(
         label     => 'backend_' . $service . '_servers_down',
