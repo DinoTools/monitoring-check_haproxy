@@ -506,7 +506,7 @@ sub check_frontends {
     );
 
     $mp->add_perfdata(
-        label     => 'frondend_' . $service . '_sessions',
+        label     => 'frontend_' . $service . '_sessions',
         value     => $sessions_current,
         max       => $sessions_limit,
         threshold => $threshold,
