@@ -37,7 +37,7 @@ my @g_long_message;
 # Configure Program details
 our ($_program, $_version, $_author);
 $_program = 'check_haproxy';
-$_version = '1.0.3';
+$_version = '1.1.0';
 $_author  = 'Jonathan Wright <github@jon.than.io>';
 
 use constant {
@@ -984,6 +984,28 @@ string.
 
 Remove sanity check forcing a maximum value to be blow any threshold as it seams
 that in some cases this is possible in HAProxy.
+
+=back
+
+=item v1.1.0
+
+=over
+
+=item *
+
+Most parts have been rewritten to use Monitoring Plugins or Nagios Plugins
+
+=item *
+
+Adding support to report performance data
+
+=item *
+
+Adding support for state 'no check'
+
+=item *
+
+Change the output to show all parts(servers, backend, frontends) not in OK state.
 
 =back
 
