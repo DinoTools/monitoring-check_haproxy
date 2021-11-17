@@ -159,9 +159,6 @@ BEGIN {
     }
 }
 
-# Alias _ to sprintf
-sub _ {return sprintf(shift, @_)}
-
 # Create hash array for holding all configuration variables
 our (%data, %checks);
 
@@ -266,7 +263,11 @@ sub main {
 
 sub _debug {
   if ($mp->opts->debug) {
-    printf "%s{} %s\n", shift, shift;
+    printf(
+      "%s{} %s\n",
+      shift,
+      sprintf(shift, @_)
+    );
   }
 }
 
@@ -372,9 +373,17 @@ sub build_checks {
     $be_crit    =  $3       if looks_like_number($3);
     $limit_warn = ($4/100)  if looks_like_number($4);
     $limit_crit = ($5/100)  if looks_like_number($5);
-    _debug('build_checks',
-           _('setting defaults to %s,%.2f,%.2f,%.2f,%.2f',
-             $state, $be_warn, $be_crit, $limit_warn, $limit_crit));
+    _debug(
+      'build_checks',
+      'setting defaults to %s,%.2f,%.2f,%.2f,%.2f',
+      (
+        $state,
+        $be_warn,
+        $be_crit,
+        $limit_warn,
+        $limit_crit
+      )
+    );
   }
 
   # Build the defaults for all checks
@@ -397,14 +406,25 @@ sub build_checks {
         limit_crit  => $limit_crit,
       );
     }
-    _debug('build_checks', _('building %s check for %s', $type, $service));
+    _debug(
+      'build_checks',
+      'building %s check for %s',
+      (
+        $type,
+        $service
+      )
+    );
   }
 
   # Merge the two arrays
   foreach my $override (sort @overrides) {
     my ($service, $state, $be_warn, $be_crit, $limit_warn, $limit_crit);
 
-    _debug('build_checks', _('processing override %s', $override));
+    _debug(
+      'build_checks',
+      'processing override %s',
+      $override
+    );
 
     next unless ($override =~ /([^:]+):([udx]?)(?:,([0-9]*)(?:,([0-9]*)(?:,([0-9]*)%?(?:,([0-9]*)%?)?)?)?)?/);
 
@@ -419,14 +439,16 @@ sub build_checks {
     $checks{$1}{'limit_warn'} = ($5/100) if looks_like_number($5) and $5 > 0 and $5 <= 100;
     $checks{$1}{'limit_crit'} = ($6/100) if looks_like_number($6) and $6 > 0 and $6 <= 100;
 
-    _debug('build_checks',
-           _('setting override for %s to %s,%d,%d,%.2f,%.2f',
-             $1,
-             $checks{$1}{'state'},
-             $checks{$1}{'be_warn'},
-             $checks{$1}{'be_crit'},
-             $checks{$1}{'limit_warn'},
-             $checks{$1}{'limit_crit'}));
+    _debug(
+      'build_checks',
+      'setting override for %s to %s,%d,%d,%.2f,%.2f',
+      $1,
+      $checks{$1}{'state'},
+      $checks{$1}{'be_warn'},
+      $checks{$1}{'be_crit'},
+      $checks{$1}{'limit_warn'},
+      $checks{$1}{'limit_crit'},
+    );
   }
 
   return %checks;
@@ -436,7 +458,11 @@ sub check_frontends {
   _debug('check_frontends', 'is starting check on frontends');
   foreach my $service (sort keys %data) {
     next unless $data{$service}{'type'} eq TYPE_FRONTEND;
-    _debug('check_frontends', _('checking FRONTEND %s', $service));
+    _debug(
+      'check_frontends',
+      'checking FRONTEND %s',
+      $service
+    );
 
     _debug('check_frontends', 'running OPEN check');
 
@@ -462,13 +488,11 @@ sub check_frontends {
     _debug('check_frontends', 'running Sessions check');
     _debug(
       'check_frontends',
-      sprintf(
-        'found %d (limit %d); thresholds are %.1f%%, %.1f%%',
-        $sessions_current,
-        $sessions_limit,
-        $sessions_warning,
-        $sessions_critical,
-      )
+      'found %d (limit %d); thresholds are %.1f%%, %.1f%%',
+      $sessions_current,
+      $sessions_limit,
+      $sessions_warning,
+      $sessions_critical,
     );
 
     my $threshold = Monitoring::Plugin::Threshold->set_thresholds(
@@ -506,7 +530,11 @@ sub check_backends {
     next unless $data{$service}{'type'} eq TYPE_BACKEND;
     next if $checks{$service}{'state'} eq 'x';
     next if $service eq 'stats';
-    _debug('check_backends', _('checking BACKEND %s', $service));
+    _debug(
+      'check_backends',
+      'checking BACKEND %s',
+      $service
+    );
 
     my ($msg, $total, $up, $down, $disabled) = ('',0,0,0,0);
 
@@ -517,8 +545,14 @@ sub check_backends {
       ++$disabled  if $data{$service}{'servers'}{$server}{'disabled'};
     }
 
-    _debug('check_backends', _('found %d up, %d down, %d disabled (%d total)',
-                               $up, $down, $disabled, $total));
+    _debug(
+      'check_backends',
+      'found %d up, %d down, %d disabled (%d total)',
+      $up,
+      $down,
+      $disabled,
+      $total,
+    );
 
     my $threshold;
     if ($checks{$service}{'state'} eq 'u') {
@@ -565,11 +599,16 @@ sub check_backends {
     }
 
     _debug('check_frontends', 'running Sessions check');
-    _debug('check_backends', _('found %d (limit %d); threshold is %.1f%% (warn) or %.1f%% (crit)',
-                               $data{$service}{'sessions'}{'current'},
-                               $data{$service}{'sessions'}{'limit'},
-                               ($checks{$service}{'limit_warn'}*100),
-                               ($checks{$service}{'limit_crit'}*100)));
+    _debug(
+      'check_backends',
+      'found %d (limit %d); threshold is %.1f%% (warn) or %.1f%% (crit)',
+      (
+        $data{$service}{'sessions'}{'current'},
+        $data{$service}{'sessions'}{'limit'},
+        ($checks{$service}{'limit_warn'}*100),
+        ($checks{$service}{'limit_crit'}*100)
+      )
+    );
 
     my $session_limit_warning = $data{$service}{'sessions'}{'limit'} * $checks{$service}{'limit_warn'};
     my $session_limit_critical = $data{$service}{'sessions'}{'limit'} * $checks{$service}{'limit_crit'};
@@ -609,7 +648,11 @@ sub check_servers {
     next if $checks{$service}{'state'} eq 'x';
     foreach my $server (sort keys %{$data{$service}{'servers'}}) {
       next if $data{$service}{'servers'}{$server}{'backend'};
-      _debug('check_servers', _('checking SERVER %s on BACKEND %s', $server, $service));
+      _debug(
+        'check_servers',
+        'checking SERVER %s on BACKEND %s',
+        ($server, $service)
+      );
 
       if ($data{$service}{'servers'}{$server}{'sessions'}{'limit'} > 0) {
         my $sessions_current = $data{$service}{'servers'}{$server}{'sessions'}{'current'};
@@ -619,8 +662,8 @@ sub check_servers {
         _debug('check_servers', 'running Sessions check');
         _debug(
           'check_servers',
-          sprintf(
-            'found %d (limit %d); thresholds are %.1f%%, %.1f%%',
+          'found %d (limit %d); thresholds are %.1f%%, %.1f%%',
+          (
             $sessions_current,
             $sessions_limit,
             $sessions_warning,
@@ -665,8 +708,8 @@ sub check_servers {
         my $queued_critical = $queued_limit * $checks{$service}{'limit_crit'};
         _debug(
           'check_servers',
-          sprintf(
-            'found %d (limit %d); thresholds are %.1f%%, %.1f%%',
+          'found %d (limit %d); thresholds are %.1f%%, %.1f%%',
+          (
             $queued_current,
             $queued_limit,
             $queued_warning,
