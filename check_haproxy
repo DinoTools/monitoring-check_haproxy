@@ -325,7 +325,7 @@ sub get_data {
       $v{$stat[STAT_PROXY_NAME]}{'servers'}{$stat[STAT_SERVICE_NAME]} = {
         active      => ($stat[STAT_SERVER_ACTIVE] ? 1 : 0),
         backup      => ($stat[STAT_SERVER_BACKUP] ? 1 : 0),
-        up          => ($stat[STAT_STATUS] eq 'UP' ? 1 : 0),
+        up          => ($stat[STAT_STATUS] =~ /^(UP|NO CHECK)/i ? 1 : 0),
         down        => ($stat[STAT_STATUS] eq 'DOWN' ? 1 : 0),
         disabled    => ($stat[STAT_STATUS] =~ /^(MAINT|DRAIN|NOLB)/i ? 1 : 0),
         connections => $stat[STAT_CONNECTIONS_TOTAL],
