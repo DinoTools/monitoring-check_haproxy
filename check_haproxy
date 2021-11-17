@@ -205,7 +205,12 @@ sub main {
     help     => 'Set/Override the defaults which will be applied to all checks',
     default  => undef,
   );
-  # overides
+  $mp->add_arg(
+    spec     => 'overrides|O=s@',
+    help     => 'Override the defaults for a particular frontend or backend',
+    default  => [],
+  );
+
   $mp->getopts;
 
   my $socket = IO::Socket::UNIX->new(
@@ -221,7 +226,7 @@ sub main {
   );
 
   %data   = get_data($socket);
-  %checks = build_checks(\@overrides);
+  %checks = build_checks(\@{$mp->opts->overrides});
 
   check_frontends() if $mp->opts->frontends;
   check_backends()  if $mp->opts->backends;
