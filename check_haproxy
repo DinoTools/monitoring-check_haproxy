@@ -174,7 +174,8 @@ sub main {
 
   $mp = Monitoring::Plugin->new(
       shortname => $_program,
-      usage     => "Usage: check_haproxy [--defaults (defaults)] [--overrides (1 2 ... n)] \n" .
+      usage     => "Usage: check_haproxy [--defaults (defaults)] [--overrides (override 1)]\n" .
+                   "                     [--overrides (override 2)] [--overrides (override n)]\n" .
                    "                     [--[no]frontends] [--[no]backends] [--[no]servers]\n" .
                    "                     [--socket (path)] [--help]",
       version   => $_version,
@@ -792,7 +793,8 @@ socket connection (by default, /var/run/haproxy.sock).
 
 =head1 SYNOPSIS
 
-check_haproxy [--defaults (defaults)] [--overrides S<(1 2 ... n)>]
+check_haproxy [--defaults (defaults)] [--overrides S<(override 1)>]
+  [--overrides S<(override 2)>] [--overrides S<(override n)>]
   [--[no]frontends] [--[no]backends] [--[no]servers]
   [--socket (path)] [--help]
 
@@ -820,12 +822,12 @@ limits for the sessions or for queues).
 Set/Override the defaults which will be applied to all checks (unless
 specifically set by --overrides). Takes the form:
 
-  C<{u,d,x},{svr_warn},{svr_crit},{sess_warn},{sess_crit}>
+C<{u,d,x},{svr_warn},{svr_crit},{sess_warn},{sess_crit}>
 
 Each of these is optional, but the positioning is important. To fully override,
 set (for example):
 
-  C<u,10,5,.25,0.5>
+C<u,10,5,.25,0.5>
 
 which means:
 
@@ -890,15 +892,15 @@ to have a flexible number of backends.
 
 =back
 
-=item B<-O>, B<--overrides> I<override override ... override>
+=item B<-O>, B<--overrides> I<override>
 
 Override the defaults for a particular frontend or backend, in the form
 {name}:{override}, where {override} is the same format as --defaults above. For
 example, to override the frontend called "api" and allow that to increase to
-limits of 15/10 for WARN/CRIT, use C<api:,15,10>. Add as many as you like as
-space-delimited options:
+limits of 15/10 for WARN/CRIT, use C<api:,15,10>. Add as many as you like by
+specifing the flag multiple times:
 
-  C<--overrides api:,15,10 assets:d,2,5 webmail:u,3,2>
+C<--overrides api:,15,10 --overrides assets:d,2,5 --overrides webmail:u,3,2>
 
 =item B<-S>, B<--socket> I</path/to/socket>
 

@@ -7,7 +7,8 @@ frontend/backend.
 
 ## Usage
 
-    check_haproxy [--defaults (defaults)] [--overrides (1 2 ... n)]
+    check_haproxy [--defaults (defaults)] [--overrides (override 1)]
+      [--overrides (override 2)] [--overrides (override n)]
       [--[no]frontends] [--[no]backends] [--[no]servers]
       [--socket (path)] [--help]
 
@@ -75,15 +76,15 @@ is less than the Warning or Critical thresholds, the error may never trigger.
 It is generally better to use `up` and percentage values where you are going
 to have a flexible number of backends.
 
-### -O, --overrides (override override ... override)
+### -O, --overrides (override)
 
 Override the defaults for a particular frontend or backend, in the form
 `name:override`, where `override` is the same format as `--defaults` above. For
 example, to override the frontend called "api" and allow that to increase to
-limits of 15/10 for WARN/CRIT, use `api:,15,10`. Add as many as you like as
-space-delimited options:
+limits of 15/10 for WARN/CRIT, use `api:,15,10`. Add as many as you like by
+specifing the flag multiple times:
 
-    --overrides api:,15,10 assets:d,2,5 webmail:u,3,2
+    --overrides api:,15,10 --overrides assets:d,2,5 --overrides webmail:u,3,2
 
 ### -S, --socket /path/to/socket
 
@@ -100,7 +101,7 @@ apply Service "Haproxy stats" {
   import "generic-service"
   check_command = "haproxy"
   vars.haproxy_socket = "/var/run/haproxy/admin.sock"
-  vars.haproxy_default = "C<d,1,1,75,90>"
+  vars.haproxy_default = "d,1,1,75,90"
   command_endpoint = host.vars.client_endpoint
   assign where host.vars.client_endpoint && host.vars.os == "Linux" && host.vars.haproxy
 }
