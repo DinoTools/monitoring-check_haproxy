@@ -1018,8 +1018,6 @@ Change the output to show all parts(servers, backend, frontends) not in OK state
 
 =back
 
-=end text
-
 =head1 AUTHOR
 
 Jonathan Wright <github@jon.than.io>
