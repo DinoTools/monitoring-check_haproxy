@@ -187,7 +187,7 @@ sub main {
     default  => 0,
   );
   $mp->add_arg(
-    spec     => 'backends|f!',
+    spec     => 'backends|b!',
     help     => 'Enable/disable checks for the backends in HAProxy',
     default  => 1,
   );
@@ -197,7 +197,7 @@ sub main {
     default  => 1,
   );
   $mp->add_arg(
-    spec     => 'servers|f!',
+    spec     => 'servers|s!',
     help     => 'Enable/disable checks for the servers in HAProxy',
     default  => 1,
   );
