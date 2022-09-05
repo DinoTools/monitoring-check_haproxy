@@ -1020,11 +1020,11 @@ Change the output to show all parts(servers, backend, frontends) not in OK state
 
 =head1 AUTHOR
 
-Jonathan Wright <github@jon.than.io>
+Jonathan Wright E<lt>github@jon.than.ioE<gt>
 
 =head1 COPYRIGHT AND LICENCE
 
-(c) 2014-2015, Jonathan Wright <github@jon.than.io>
+(c) 2014-2015, Jonathan Wright E<lt>github@jon.than.ioE<gt>
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
