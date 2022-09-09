@@ -437,7 +437,7 @@ sub build_checks {
       $override
     );
 
-    next unless ($override =~ /([^:]+):([udx]?)(?:,([0-9]*)(?:,([0-9]*)(?:,([0-9]*)%?(?:,([0-9]*)%?)?)?)?)?/);
+    next unless ($override =~ /([a-zA-Z0-9-_:.]+):([udx]?)(?:,([0-9]*)(?:,([0-9]*)(?:,([0-9]*)%?(?:,([0-9]*)%?)?)?)?)?/);
 
     next unless exists $data{$1};
 
