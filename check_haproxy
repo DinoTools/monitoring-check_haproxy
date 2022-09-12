@@ -30,6 +30,7 @@ use Carp;
 
 # Import Modules
 #use Getopt::Long qw(:config no_ignore_case);
+use POSIX;
 use Pod::Usage qw(pod2usage);
 use IO::Socket::UNIX qw( SOCK_STREAM );
 use Data::Dumper;
@@ -583,6 +584,8 @@ sub check_backends {
 
     my $backends_warning;
     my $backends_critical;
+    my $backends_warning_threshold;
+    my $backends_critical_threshold;
 
     my $backends_current  = $up;
     my $backends_limit    = $total;
@@ -590,18 +593,18 @@ sub check_backends {
 
     if ($checks{$service}{'state'} eq 'u') {
       $metric = $up;
-      $backends_warning  = $be_warn < 0 ? $backends_limit * $be_warn : $be_warn;
-      $backends_critical = $be_crit < 0 ? $backends_limit * $be_crit : $be_crit;
+      $backends_warning  = $be_warn < 1 ? ceil($backends_limit * $be_warn) : $be_warn;
+      $backends_critical = $be_crit < 1 ? ceil($backends_limit * $be_crit) : $be_crit;
 
-      $backends_warning = sprintf('@%i', $backends_warning);
-      $backends_critical = sprintf('@%i', $backends_critical);
+      $backends_warning_threshold = sprintf('%i:', $backends_warning);
+      $backends_critical_threshold = sprintf('%i:', $backends_critical);
     } else {
       $metric = $down;
-      $backends_warning  = $be_warn < 0 ? $backends_limit * $be_warn : $be_warn;
-      $backends_critical = $be_crit < 0 ? $backends_limit * $be_crit : $be_crit;
+      $backends_warning  = $be_warn < 1 ? $backends_limit * $be_warn : $be_warn;
+      $backends_critical = $be_crit < 1 ? $backends_limit * $be_crit : $be_crit;
 
-      $backends_warning = sprintf('@%i:', $backends_warning);
-      $backends_critical = sprintf('@%i:', $backends_critical);
+      $backends_warning_threshold = sprintf('~:%i', $backends_warning);
+      $backends_critical_threshold = sprintf('~:%i', $backends_critical);
     }
 
     _debug(
@@ -616,25 +619,30 @@ sub check_backends {
     );
 
     my $threshold = Monitoring::Plugin::Threshold->set_thresholds(
-      warning   => $backends_warning,
-      critical  => $backends_critical,
+      warning   => $backends_warning_threshold,
+      critical  => $backends_critical_threshold,
     );
 
     $mp->add_perfdata(
-        label     => 'backend_' . $service . '_servers_up',
-        value     => $up,
-        max       => $total,
+        label    => 'backend_' . $service . '_servers_up',
+        value    => $up,
+        warning  => $checks{$service}{'state'} eq 'u' ? $backends_warning : undef,
+        critical => $checks{$service}{'state'} eq 'u' ? $backends_critical : undef,
+        max      => $total,
     );
 
     $mp->add_perfdata(
-        label     => 'backend_' . $service . '_servers_down',
-        value     => $down,
-        max       => $total,
+        label    => 'backend_' . $service . '_servers_down',
+        value    => $down,
+        warning  => $checks{$service}{'state'} eq 'd' ? $backends_warning : undef,
+        critical => $checks{$service}{'state'} eq 'd' ? $backends_critical : undef,
+        max      => $total,
     );
+
     $mp->add_perfdata(
-        label     => 'backend_' . $service . '_servers_disabled',
-        value     => $disabled,
-        max       => $total,
+        label => 'backend_' . $service . '_servers_disabled',
+        value => $disabled,
+        max   => $total,
     );
 
     if ($threshold->get_status($metric) != OK) {
