@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: none
+# SPDX-License-Identifier: CC0-1.0
+
+name: apidocs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Install packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends perl mkdocs
+    - name: Build documentation
+      run: mkdocs build
+    - name: Push API documentation to Github Pages
+      uses: peaceiris/actions-gh-pages@v3
+      if: ${{ github.ref == 'refs/heads/main' }}
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./site
+        commit_message: "Generate API documentation"

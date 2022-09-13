@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: none
+# SPDX-License-Identifier: CC0-1.0
+
+site_name: HAProxy monitoring plugin
+nav:
+    - Home: index.md
+    - License: LICENSE.md
+    - Issue Tracker: https://github.com/DinoTools/monitoring-check_haproxy/issues
+    - Git Repo: https://github.com/DinoTools/monitoring-check_haproxy
+    - Manpages:
+        - check_haproxy: man/check_haproxy.md
+theme: readthedocs
