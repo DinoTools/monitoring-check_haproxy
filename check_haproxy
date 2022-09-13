@@ -521,8 +521,12 @@ sub check_frontends {
     next unless $data{$service}{'sessions'}{'limit'} > 0;
     my $sessions_current = $data{$service}{'sessions'}{'current'};
     my $sessions_limit = $data{$service}{'sessions'}{'limit'};
-    my $sessions_warning = $sessions_limit * $checks{$service}{'limit_warn'};
-    my $sessions_critical = $sessions_limit * $checks{$service}{'limit_crit'};
+
+    my $limit_warn = $checks{$service}{'limit_warn'};
+    my $limit_crit = $checks{$service}{'limit_crit'};
+
+    my $sessions_warning = $limit_warn < 1 ? ceil($sessions_limit * $limit_warn) : $limit_warn;
+    my $sessions_critical = $limit_crit < 1 ? ceil($sessions_limit * $limit_crit) : $limit_crit;
 
     _debug('check_frontends', 'running Sessions check');
     _debug(
@@ -681,42 +685,46 @@ sub check_backends {
       );
     }
 
-    my $session_current = $data{$service}{'sessions'}{'current'};
-    my $session_limit = $data{$service}{'sessions'}{'limit'};
-    my $session_warning = $session_limit * $checks{$service}{'limit_warn'};
-    my $session_critical = $session_limit * $checks{$service}{'limit_crit'};
+    my $sessions_current = $data{$service}{'sessions'}{'current'};
+    my $sessions_limit = $data{$service}{'sessions'}{'limit'};
+
+    my $limit_warn = $checks{$service}{'limit_warn'};
+    my $limit_crit = $checks{$service}{'limit_crit'};
+
+    my $sessions_warning = $limit_warn < 1 ? ceil($sessions_limit * $limit_warn) : $limit_warn;
+    my $sessions_critical = $limit_crit < 1 ? ceil($sessions_limit * $limit_crit) : $limit_crit;
 
     _debug('check_frontends', 'running Sessions check');
     _debug(
       'check_backends',
       DEBUG_MSG_THRESHOLDS,
       (
-       $session_current,
-       $session_limit,
-       $session_warning,
-       $session_critical,
+       $sessions_current,
+       $sessions_limit,
+       $sessions_warning,
+       $sessions_critical,
       )
     );
 
     $threshold = Monitoring::Plugin::Threshold->set_thresholds(
-        warning   => $session_warning,
-        critical  => $session_critical,
+        warning   => $sessions_warning,
+        critical  => $sessions_critical,
     );
 
     $mp->add_perfdata(
         label     => 'backend_' . $service . '_sessions',
-        value     => $session_current,
+        value     => $sessions_current,
         threshold => $threshold
     );
 
-    if ($threshold->get_status($session_current) != OK) {
+    if ($threshold->get_status($sessions_current) != OK) {
       $mp->add_message(
-        $threshold->get_status($session_current),
+        $threshold->get_status($sessions_current),
         sprintf(
           'Backend %s sessions %d of %d',
           $service,
-          $session_current,
-          $session_limit,
+          $sessions_current,
+          $sessions_limit,
         )
       );
     }
@@ -740,8 +748,13 @@ sub check_servers {
       if ($data{$service}{'servers'}{$server}{'sessions'}{'limit'} > 0) {
         my $sessions_current = $data{$service}{'servers'}{$server}{'sessions'}{'current'};
         my $sessions_limit = $data{$service}{'servers'}{$server}{'sessions'}{'limit'};
-        my $sessions_warning = $sessions_limit * $checks{$service}{'limit_warn'};
-        my $sessions_critical = $sessions_limit * $checks{$service}{'limit_crit'};
+
+        my $limit_warn = $checks{$service}{'limit_warn'};
+        my $limit_crit = $checks{$service}{'limit_crit'};
+
+        my $sessions_warning = $limit_warn < 1 ? ceil($sessions_limit * $limit_warn) : $limit_warn;
+        my $sessions_critical = $limit_crit < 1 ? ceil($sessions_limit * $limit_crit) : $limit_crit;
+
         _debug('check_servers', 'running Sessions check');
         _debug(
           'check_servers',
