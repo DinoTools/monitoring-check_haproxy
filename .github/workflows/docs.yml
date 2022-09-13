@@ -6,25 +6,45 @@ name: docs
 on:
   push:
     branches: [main]
-  pull_request:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
+  # Single deploy job since we're just deploying
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
-    - name: Install packages
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends perl mkdocs
-    - name: Build documentation
-      run: |
-        pod2html --infile check_haproxy --outfile docs/man/check_haproxy.md --header --nopoderrors
-        mkdocs build
-    - name: Push API documentation to Github Pages
-      uses: peaceiris/actions-gh-pages@v3
-      if: ${{ github.ref == 'refs/heads/main' }}
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./site
-        commit_message: "Generate API documentation"
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Pages
+        uses: actions/configure-pages@v2
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends perl mkdocs
+      - name: Build documentation
+        run: |
+          pod2html --infile check_haproxy --outfile docs/man/check_haproxy.md --header --nopoderrors
+          mkdocs build
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          # Upload entire repository
+          path: './site'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
