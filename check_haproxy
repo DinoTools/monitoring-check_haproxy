@@ -147,6 +147,11 @@ use constant {
   DEBUG_MSG_THRESHOLDS => 'found %d (limit %d); thresholds are %s (warn) %s (crit)'
 };
 
+my $REGEX_PARSE_VALUES = '([ud]?),' .
+                         '(?:(?:((?:0?\.)?[0-9]+|[0-9]+)(%)?|)' .
+                         '(?:,(?:((?:0?\.)?[0-9]+|[0-9]+)(%)?|)' .
+                         '(?:,(?:((?:0?\.)?[0-9]+|[0-9]+)(%)?|)' .
+                         '(?:,(?:((?:0?\.)?[0-9]+|[0-9]+)(%)?|))?)?)?)?';
 BEGIN {
     eval {
         require Monitoring::Plugin;
@@ -383,12 +388,21 @@ sub build_checks {
 
   # See if there is an override for the defaults, then use those
   if (defined $mp->opts->defaults
-      and $mp->opts->defaults =~ /([ud]?),(?:((?:0?\.)?[0-9]*)(?:,((?:0?\.)?[0-9]*)(?:,((?:0?\.)?[0-9]*)%?(?:,((?:0?\.)?[0-9]*)%?)?)?)?)?/) {
-    $state      =  $1       if $1;
-    $be_warn    =  $2       if looks_like_number($2);
-    $be_crit    =  $3       if looks_like_number($3);
-    $limit_warn =  $4       if looks_like_number($4);
-    $limit_crit =  $5       if looks_like_number($5);
+      and $mp->opts->defaults =~ /$REGEX_PARSE_VALUES/) {
+    $state      =  $1 if $1;
+    if (looks_like_number($2)) {
+      $be_warn = (defined($3) and $3 eq '%') ? $2 / 100 : $2;
+    }
+    if (looks_like_number($4)) {
+      $be_crit = (defined($5) and $5 eq '%') ? $4 / 100 : $4;
+    }
+    if (looks_like_number($6)) {
+      $limit_warn = (defined($7) and $7 eq '%') ? $6 / 100 : $6;
+    }
+    if (looks_like_number($8)) {
+      $limit_warn = (defined($9) and $9 eq '%') ? $8 / 100 : $8;
+    }
+
     _debug(
       'build_checks',
       'setting defaults to %s,%.2f,%.2f,%.2f,%.2f',
@@ -442,22 +456,30 @@ sub build_checks {
       $override
     );
 
-    next unless ($override =~ /([a-zA-Z0-9-_:.]+):([udx]?)(?:,([0-9]*)(?:,([0-9]*)(?:,([0-9]*)%?(?:,([0-9]*)%?)?)?)?)?/);
+    next unless ($override =~ /([a-zA-Z0-9-_:.]+):$REGEX_PARSE_VALUES/);
 
     next unless exists $data{$1};
 
     if ($data{$1}{'type'} eq TYPE_BACKEND) {
-      $checks{$1}{'state'}    =  $2      if $2 and ($2 eq 'u' or $2 eq 'd' or $2 eq 'x');
-      $checks{$1}{'be_warn'}  =  $3      if looks_like_number($3) and $3 >= 0;
-      $checks{$1}{'be_crit'}  =  $4      if looks_like_number($4) and $4 >= 0;
+      $checks{$1}{'state'} = $2 if $2 and ($2 eq 'u' or $2 eq 'd' or $2 eq 'x');
+      if (looks_like_number($3)) {
+        $checks{$1}{'be_warn'} = (defined($4) and $4 eq '%') ? $3 / 100 : $3;
+      }
+      if (looks_like_number($5)) {
+        $checks{$1}{'be_crit'} = (defined($6) and $$6 eq '%') ? $5 / 100 : $5;
+      }
     }
 
-    $checks{$1}{'limit_warn'} =  $5      if looks_like_number($5) and $5 > 0 and $5 <= 100;
-    $checks{$1}{'limit_crit'} =  $6      if looks_like_number($6) and $6 > 0 and $6 <= 100;
+    if (looks_like_number($7)) {
+      $checks{$1}{'limit_warn'} = (defined($8) and $$8 eq '%') ? $7 / 100 : $7;
+    }
+    if (looks_like_number($9)) {
+      $checks{$1}{'limit_crit'} = (defined($10) and $$10 eq '%') ? $9 / 100 : $9;
+    }
 
     _debug(
       'build_checks',
-      'setting override for %s to %s,%d,%d,%.2f,%.2f',
+      'setting override for %s to %s,%.2f,%.2f,%.2f,%.2f',
       $1,
       $checks{$1}{'state'},
       $checks{$1}{'be_warn'},
@@ -600,8 +622,8 @@ sub check_backends {
       $backends_critical_threshold = sprintf('%i:', $backends_critical);
     } else {
       $metric = $down;
-      $backends_warning  = $be_warn < 1 ? $backends_limit * $be_warn : $be_warn;
-      $backends_critical = $be_crit < 1 ? $backends_limit * $be_crit : $be_crit;
+      $backends_warning  = $be_warn < 1 ? ceil($backends_limit * $be_warn) : $be_warn;
+      $backends_critical = $be_crit < 1 ? ceil($backends_limit * $be_crit) : $be_crit;
 
       $backends_warning_threshold = sprintf('~:%i', $backends_warning);
       $backends_critical_threshold = sprintf('~:%i', $backends_critical);
