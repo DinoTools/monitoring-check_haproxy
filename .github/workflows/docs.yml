@@ -18,7 +18,9 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends perl mkdocs
     - name: Build documentation
-      run: mkdocs build
+      run: |
+        pod2html --infile check_haproxy --outfile docs/man/check_haproxy.md --header --nopoderrors
+        mkdocs build
     - name: Push API documentation to Github Pages
       uses: peaceiris/actions-gh-pages@v3
       if: ${{ github.ref == 'refs/heads/main' }}
