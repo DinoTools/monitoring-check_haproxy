@@ -30,6 +30,7 @@ use Carp;
 
 # Import Modules
 #use Getopt::Long qw(:config no_ignore_case);
+use POSIX;
 use Pod::Usage qw(pod2usage);
 use IO::Socket::UNIX qw( SOCK_STREAM );
 use Data::Dumper;
@@ -142,6 +143,15 @@ use constant {
   UNKNOWN    => 3,
 };
 
+use constant {
+  DEBUG_MSG_THRESHOLDS => 'found %d (limit %d); thresholds are %s (warn) %s (crit)'
+};
+
+my $REGEX_PARSE_VALUES = '([ud]?),' .
+                         '(?:(?:((?:0?\.)?[0-9]+|[0-9]+)(%)?|)' .
+                         '(?:,(?:((?:0?\.)?[0-9]+|[0-9]+)(%)?|)' .
+                         '(?:,(?:((?:0?\.)?[0-9]+|[0-9]+)(%)?|)' .
+                         '(?:,(?:((?:0?\.)?[0-9]+|[0-9]+)(%)?|))?)?)?)?';
 BEGIN {
     eval {
         require Monitoring::Plugin;
@@ -378,12 +388,21 @@ sub build_checks {
 
   # See if there is an override for the defaults, then use those
   if (defined $mp->opts->defaults
-      and $mp->opts->defaults =~ /([ud]?),(?:((?:0?\.)?[0-9]*)(?:,((?:0?\.)?[0-9]*)(?:,((?:0?\.)?[0-9]*)%?(?:,((?:0?\.)?[0-9]*)%?)?)?)?)?/) {
-    $state      =  $1       if $1;
-    $be_warn    =  $2       if looks_like_number($2);
-    $be_crit    =  $3       if looks_like_number($3);
-    $limit_warn = ($4/100)  if looks_like_number($4);
-    $limit_crit = ($5/100)  if looks_like_number($5);
+      and $mp->opts->defaults =~ /$REGEX_PARSE_VALUES/) {
+    $state      =  $1 if $1;
+    if (looks_like_number($2)) {
+      $be_warn = (defined($3) and $3 eq '%') ? $2 / 100 : $2;
+    }
+    if (looks_like_number($4)) {
+      $be_crit = (defined($5) and $5 eq '%') ? $4 / 100 : $4;
+    }
+    if (looks_like_number($6)) {
+      $limit_warn = (defined($7) and $7 eq '%') ? $6 / 100 : $6;
+    }
+    if (looks_like_number($8)) {
+      $limit_warn = (defined($9) and $9 eq '%') ? $8 / 100 : $8;
+    }
+
     _debug(
       'build_checks',
       'setting defaults to %s,%.2f,%.2f,%.2f,%.2f',
@@ -437,22 +456,30 @@ sub build_checks {
       $override
     );
 
-    next unless ($override =~ /([a-zA-Z0-9-_:.]+):([udx]?)(?:,([0-9]*)(?:,([0-9]*)(?:,([0-9]*)%?(?:,([0-9]*)%?)?)?)?)?/);
+    next unless ($override =~ /([a-zA-Z0-9-_:.]+):$REGEX_PARSE_VALUES/);
 
     next unless exists $data{$1};
 
     if ($data{$1}{'type'} eq TYPE_BACKEND) {
-      $checks{$1}{'state'}    =  $2      if $2 and ($2 eq 'u' or $2 eq 'd' or $2 eq 'x');
-      $checks{$1}{'be_warn'}  =  $3      if looks_like_number($3) and $3 >= 0;
-      $checks{$1}{'be_crit'}  =  $4      if looks_like_number($4) and $4 >= 0;
+      $checks{$1}{'state'} = $2 if $2 and ($2 eq 'u' or $2 eq 'd' or $2 eq 'x');
+      if (looks_like_number($3)) {
+        $checks{$1}{'be_warn'} = (defined($4) and $4 eq '%') ? $3 / 100 : $3;
+      }
+      if (looks_like_number($5)) {
+        $checks{$1}{'be_crit'} = (defined($6) and $$6 eq '%') ? $5 / 100 : $5;
+      }
     }
 
-    $checks{$1}{'limit_warn'} = ($5/100) if looks_like_number($5) and $5 > 0 and $5 <= 100;
-    $checks{$1}{'limit_crit'} = ($6/100) if looks_like_number($6) and $6 > 0 and $6 <= 100;
+    if (looks_like_number($7)) {
+      $checks{$1}{'limit_warn'} = (defined($8) and $$8 eq '%') ? $7 / 100 : $7;
+    }
+    if (looks_like_number($9)) {
+      $checks{$1}{'limit_crit'} = (defined($10) and $$10 eq '%') ? $9 / 100 : $9;
+    }
 
     _debug(
       'build_checks',
-      'setting override for %s to %s,%d,%d,%.2f,%.2f',
+      'setting override for %s to %s,%.2f,%.2f,%.2f,%.2f',
       $1,
       $checks{$1}{'state'},
       $checks{$1}{'be_warn'},
@@ -494,12 +521,17 @@ sub check_frontends {
     next unless $data{$service}{'sessions'}{'limit'} > 0;
     my $sessions_current = $data{$service}{'sessions'}{'current'};
     my $sessions_limit = $data{$service}{'sessions'}{'limit'};
-    my $sessions_warning = $sessions_limit * $checks{$service}{'limit_warn'};
-    my $sessions_critical = $sessions_limit * $checks{$service}{'limit_crit'};
+
+    my $limit_warn = $checks{$service}{'limit_warn'};
+    my $limit_crit = $checks{$service}{'limit_crit'};
+
+    my $sessions_warning = $limit_warn < 1 ? ceil($sessions_limit * $limit_warn) : $limit_warn;
+    my $sessions_critical = $limit_crit < 1 ? ceil($sessions_limit * $limit_crit) : $limit_crit;
+
     _debug('check_frontends', 'running Sessions check');
     _debug(
       'check_frontends',
-      'found %d (limit %d); thresholds are %.1f%%, %.1f%%',
+      DEBUG_MSG_THRESHOLDS,
       $sessions_current,
       $sessions_limit,
       $sessions_warning,
@@ -565,42 +597,83 @@ sub check_backends {
       $total,
     );
 
-    my $threshold;
-    my $warning_value;
-    my $critical_value;
+    my $be_warn = $checks{$service}{'be_warn'};
+    my $be_crit = $checks{$service}{'be_crit'};
+
+    # if ($checks{$service}{'state'} eq 'u') {
+    #   $warning_value = $checks{$service}{'be_warn'};
+    #   $critical_value = $checks{$service}{'be_crit'};
+    # } else {
+    #   $warning_value = $total - $checks{$service}{'be_warn'};
+    #   $critical_value = $total - $checks{$service}{'be_crit'};
+    # }
+
+    my $backends_warning;
+    my $backends_critical;
+    my $backends_warning_threshold;
+    my $backends_critical_threshold;
+
+    my $backends_current  = $up;
+    my $backends_limit    = $total;
+    my $metric;
+
     if ($checks{$service}{'state'} eq 'u') {
-      $warning_value = $checks{$service}{'be_warn'};
-      $critical_value = $checks{$service}{'be_crit'};
+      $metric = $up;
+      $backends_warning  = $be_warn < 1 ? ceil($backends_limit * $be_warn) : $be_warn;
+      $backends_critical = $be_crit < 1 ? ceil($backends_limit * $be_crit) : $be_crit;
+
+      $backends_warning_threshold = sprintf('%i:', $backends_warning);
+      $backends_critical_threshold = sprintf('%i:', $backends_critical);
     } else {
-      $warning_value = $total - $checks{$service}{'be_warn'};
-      $critical_value = $total - $checks{$service}{'be_crit'};
+      $metric = $down;
+      $backends_warning  = $be_warn < 1 ? ceil($backends_limit * $be_warn) : $be_warn;
+      $backends_critical = $be_crit < 1 ? ceil($backends_limit * $be_crit) : $be_crit;
+
+      $backends_warning_threshold = sprintf('~:%i', $backends_warning);
+      $backends_critical_threshold = sprintf('~:%i', $backends_critical);
     }
-    $threshold = Monitoring::Plugin::Threshold->set_thresholds(
-      warning   => sprintf('%i:', $warning_value),
-      critical  => sprintf('%i:', $critical_value),
+
+    _debug(
+      'check_backends',
+      DEBUG_MSG_THRESHOLDS,
+      (
+       $backends_current,
+       $backends_limit,
+       $backends_warning,
+       $backends_critical,
+      )
+    );
+
+    my $threshold = Monitoring::Plugin::Threshold->set_thresholds(
+      warning   => $backends_warning_threshold,
+      critical  => $backends_critical_threshold,
     );
 
     $mp->add_perfdata(
-        label     => 'backend_' . $service . '_servers_up',
-        value     => $up,
-        max       => $total,
-        warning   => $warning_value,
-        critical  => $critical_value,
-    );
-    $mp->add_perfdata(
-        label     => 'backend_' . $service . '_servers_down',
-        value     => $down,
-        max       => $total,
-    );
-    $mp->add_perfdata(
-        label     => 'backend_' . $service . '_servers_disabled',
-        value     => $disabled,
-        max       => $total,
+        label    => 'backend_' . $service . '_servers_up',
+        value    => $up,
+        warning  => $checks{$service}{'state'} eq 'u' ? $backends_warning : undef,
+        critical => $checks{$service}{'state'} eq 'u' ? $backends_critical : undef,
+        max      => $total,
     );
 
-    if ($threshold->get_status($up) != OK) {
+    $mp->add_perfdata(
+        label    => 'backend_' . $service . '_servers_down',
+        value    => $down,
+        warning  => $checks{$service}{'state'} eq 'd' ? $backends_warning : undef,
+        critical => $checks{$service}{'state'} eq 'd' ? $backends_critical : undef,
+        max      => $total,
+    );
+
+    $mp->add_perfdata(
+        label => 'backend_' . $service . '_servers_disabled',
+        value => $disabled,
+        max   => $total,
+    );
+
+    if ($threshold->get_status($metric) != OK) {
       $mp->add_message(
-        $threshold->get_status($up),
+        $threshold->get_status($metric),
         sprintf(
           'Backend %s servers (up: %d, down %d, disabled %d, total %d)',
           $service,
@@ -612,42 +685,46 @@ sub check_backends {
       );
     }
 
+    my $sessions_current = $data{$service}{'sessions'}{'current'};
+    my $sessions_limit = $data{$service}{'sessions'}{'limit'};
+
+    my $limit_warn = $checks{$service}{'limit_warn'};
+    my $limit_crit = $checks{$service}{'limit_crit'};
+
+    my $sessions_warning = $limit_warn < 1 ? ceil($sessions_limit * $limit_warn) : $limit_warn;
+    my $sessions_critical = $limit_crit < 1 ? ceil($sessions_limit * $limit_crit) : $limit_crit;
+
     _debug('check_frontends', 'running Sessions check');
     _debug(
       'check_backends',
-      'found %d (limit %d); threshold is %.1f%% (warn) or %.1f%% (crit)',
+      DEBUG_MSG_THRESHOLDS,
       (
-        $data{$service}{'sessions'}{'current'},
-        $data{$service}{'sessions'}{'limit'},
-        ($checks{$service}{'limit_warn'}*100),
-        ($checks{$service}{'limit_crit'}*100)
+       $sessions_current,
+       $sessions_limit,
+       $sessions_warning,
+       $sessions_critical,
       )
     );
 
-    my $session_limit_warning = $data{$service}{'sessions'}{'limit'} * $checks{$service}{'limit_warn'};
-    my $session_limit_critical = $data{$service}{'sessions'}{'limit'} * $checks{$service}{'limit_crit'};
-
     $threshold = Monitoring::Plugin::Threshold->set_thresholds(
-        warning   => $session_limit_warning,
-        critical  => $session_limit_critical,
+        warning   => $sessions_warning,
+        critical  => $sessions_critical,
     );
-
-    my $value = $data{$service}{'sessions'}{'current'};
 
     $mp->add_perfdata(
         label     => 'backend_' . $service . '_sessions',
-        value     => $value,
+        value     => $sessions_current,
         threshold => $threshold
     );
 
-    if ($threshold->get_status($value) != OK) {
+    if ($threshold->get_status($sessions_current) != OK) {
       $mp->add_message(
-        $threshold->get_status($value),
+        $threshold->get_status($sessions_current),
         sprintf(
           'Backend %s sessions %d of %d',
           $service,
-          $value,
-          $data{$service}{'sessions'}{'limit'},
+          $sessions_current,
+          $sessions_limit,
         )
       );
     }
@@ -671,12 +748,17 @@ sub check_servers {
       if ($data{$service}{'servers'}{$server}{'sessions'}{'limit'} > 0) {
         my $sessions_current = $data{$service}{'servers'}{$server}{'sessions'}{'current'};
         my $sessions_limit = $data{$service}{'servers'}{$server}{'sessions'}{'limit'};
-        my $sessions_warning = $sessions_limit * $checks{$service}{'limit_warn'};
-        my $sessions_critical = $sessions_limit * $checks{$service}{'limit_crit'};
+
+        my $limit_warn = $checks{$service}{'limit_warn'};
+        my $limit_crit = $checks{$service}{'limit_crit'};
+
+        my $sessions_warning = $limit_warn < 1 ? ceil($sessions_limit * $limit_warn) : $limit_warn;
+        my $sessions_critical = $limit_crit < 1 ? ceil($sessions_limit * $limit_crit) : $limit_crit;
+
         _debug('check_servers', 'running Sessions check');
         _debug(
           'check_servers',
-          'found %d (limit %d); thresholds are %.1f%%, %.1f%%',
+          DEBUG_MSG_THRESHOLDS,
           (
             $sessions_current,
             $sessions_limit,
@@ -722,7 +804,7 @@ sub check_servers {
         my $queued_critical = $queued_limit * $checks{$service}{'limit_crit'};
         _debug(
           'check_servers',
-          'found %d (limit %d); thresholds are %.1f%%, %.1f%%',
+          DEBUG_MSG_THRESHOLDS,
           (
             $queued_current,
             $queued_limit,
