@@ -400,7 +400,7 @@ sub build_checks {
       $limit_warn = (defined($7) and $7 eq '%') ? $6 / 100 : $6;
     }
     if (looks_like_number($8)) {
-      $limit_warn = (defined($9) and $9 eq '%') ? $8 / 100 : $8;
+      $limit_crit = (defined($9) and $9 eq '%') ? $8 / 100 : $8;
     }
 
     _debug(
