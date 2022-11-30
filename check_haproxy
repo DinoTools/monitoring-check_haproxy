@@ -43,7 +43,7 @@ my @g_long_message;
 # Configure Program details
 our ($_program, $_version, $_author);
 $_program = 'check_haproxy';
-$_version = '1.1.1';
+$_version = '1.2.0';
 $_author  = 'Jonathan Wright <github@jon.than.io>';
 
 use constant {
