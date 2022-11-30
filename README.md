@@ -5,6 +5,8 @@ This is a Nagios plugin to check the status of HAProxy over a socket connection
 is operating within accepted limits, as per the defaults, or as set for each
 frontend/backend.
 
+[![docs](https://github.com/DinoTools/monitoring-check_haproxy/actions/workflows/docs.yml/badge.svg)](https://dinotools.github.io/monitoring-check_haproxy/)
+
 ## Usage
 
     check_haproxy [--defaults (defaults)] [--overrides (override 1)]
