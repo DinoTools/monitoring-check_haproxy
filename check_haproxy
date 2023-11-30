@@ -147,11 +147,12 @@ use constant {
   DEBUG_MSG_THRESHOLDS => 'found %d (limit %d); thresholds are %s (warn) %s (crit)'
 };
 
-my $REGEX_PARSE_VALUES = '([ud]?),' .
+my $REGEX_PARSE_VALUES = '([udx]?)' .
+                         '(?:,' .
                          '(?:(?:((?:0?\.)?[0-9]+|[0-9]+)(%)?|)' .
                          '(?:,(?:((?:0?\.)?[0-9]+|[0-9]+)(%)?|)' .
                          '(?:,(?:((?:0?\.)?[0-9]+|[0-9]+)(%)?|)' .
-                         '(?:,(?:((?:0?\.)?[0-9]+|[0-9]+)(%)?|))?)?)?)?';
+                         '(?:,(?:((?:0?\.)?[0-9]+|[0-9]+)(%)?|))?)?)?)?)?';
 BEGIN {
     eval {
         require Monitoring::Plugin;
@@ -456,36 +457,70 @@ sub build_checks {
       $override
     );
 
-    next unless ($override =~ /([a-zA-Z0-9-_:.]+):$REGEX_PARSE_VALUES/);
+    my (
+      $override_name,
+      $override_state,
+      $override_be_warn,
+      $override_be_warn_unit,
+      $override_be_crit,
+      $override_be_crit_unit,
+      $override_limit_warn,
+      $override_limit_warn_unit,
+      $override_limit_crit,
+      $override_limit_crit_unit
+    );
+    my @matches;
+    if (@matches = $override =~ /^([a-zA-Z0-9-_:.]+):${REGEX_PARSE_VALUES}$/) {
+      $override_name = shift @matches;
+      (
+        $override_state,
+        $override_be_warn,
+        $override_be_warn_unit,
+        $override_be_crit,
+        $override_be_crit_unit,
+        $override_limit_warn,
+        $override_limit_warn_unit,
+        $override_limit_crit,
+        $override_limit_crit_unit
+      ) = @matches;
+    } else {
+      wrap_exit(
+        UNKNOWN,
+        sprintf(
+          'Unable to parse override "%s"',
+          $override
+        )
+      );
+    }
 
-    next unless exists $data{$1};
+    next unless exists $data{$override_name};
 
-    if ($data{$1}{'type'} eq TYPE_BACKEND) {
-      $checks{$1}{'state'} = $2 if $2 and ($2 eq 'u' or $2 eq 'd' or $2 eq 'x');
-      if (looks_like_number($3)) {
-        $checks{$1}{'be_warn'} = (defined($4) and $4 eq '%') ? $3 / 100 : $3;
+    if ($data{$override_name}{'type'} eq TYPE_BACKEND) {
+      $checks{$override_name}{'state'} = $override_state if $override_state and ($override_state eq 'u' or $override_state eq 'd' or $override_state eq 'x');
+      if (looks_like_number($override_be_warn)) {
+        $checks{$override_name}{'be_warn'} = (defined($override_be_warn_unit) and $override_be_warn_unit eq '%') ? $override_be_warn / 100 : $override_be_warn;
       }
-      if (looks_like_number($5)) {
-        $checks{$1}{'be_crit'} = (defined($6) and $$6 eq '%') ? $5 / 100 : $5;
+      if (looks_like_number($override_be_crit)) {
+        $checks{$override_name}{'be_crit'} = (defined($override_be_crit_unit) and $override_be_crit_unit eq '%') ? $override_be_crit / 100 : $override_be_crit;
       }
     }
 
-    if (looks_like_number($7)) {
-      $checks{$1}{'limit_warn'} = (defined($8) and $$8 eq '%') ? $7 / 100 : $7;
+    if (looks_like_number($override_limit_warn)) {
+      $checks{$override_name}{'limit_warn'} = (defined($override_limit_warn_unit) and $override_limit_warn_unit eq '%') ? $override_limit_warn / 100 : $override_limit_warn;
     }
-    if (looks_like_number($9)) {
-      $checks{$1}{'limit_crit'} = (defined($10) and $$10 eq '%') ? $9 / 100 : $9;
+    if (looks_like_number($override_limit_crit)) {
+      $checks{$override_name}{'limit_crit'} = (defined($override_limit_crit_unit) and $override_limit_crit_unit eq '%') ? $override_limit_crit / 100 : $override_limit_crit;
     }
 
     _debug(
       'build_checks',
       'setting override for %s to %s,%.2f,%.2f,%.2f,%.2f',
-      $1,
-      $checks{$1}{'state'},
-      $checks{$1}{'be_warn'},
-      $checks{$1}{'be_crit'},
-      $checks{$1}{'limit_warn'},
-      $checks{$1}{'limit_crit'},
+      $override_name,
+      $checks{$override_name}{'state'},
+      $checks{$override_name}{'be_warn'},
+      $checks{$override_name}{'be_crit'},
+      $checks{$override_name}{'limit_warn'},
+      $checks{$override_name}{'limit_crit'},
     );
   }
 
