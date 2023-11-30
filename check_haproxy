@@ -8,6 +8,7 @@
 
 # Nagios Plugin to check the state of HAProxy.
 #  (c) 2014-2015 Jonathan Wright <github@jon.than.io>
+#  (c) 2021- PhiBo (DinoTools)
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -43,8 +44,8 @@ my @g_long_message;
 # Configure Program details
 our ($_program, $_version, $_author);
 $_program = 'check_haproxy';
-$_version = '1.2.0';
-$_author  = 'Jonathan Wright <github@jon.than.io>';
+$_version = '1.2.1';
+$_author  = 'PhiBo | Jonathan Wright <github@jon.than.io>';
 
 use constant {
   # Field names to locations for all the CSV data provided by HAProxy
@@ -1133,6 +1134,44 @@ Change the output to show all parts(servers, backend, frontends) not in OK state
 
 =back
 
+=item v1.1.1
+
+=over
+
+=item *
+
+Allow colon in backend names in overrides
+
+=item *
+
+Minor fixes and update of documentation
+
+=back
+
+=item v1.2.0
+
+=over
+
+=item *
+
+Make check working as documented
+
+=item *
+
+Fix threshold calculation
+
+=back
+
+=item v1.2.1
+
+=over
+
+=item *
+
+Fix issue with excludes in overrides
+
+=back
+
 =back
 
 =head1 AUTHOR
@@ -1142,6 +1181,7 @@ Jonathan Wright E<lt>github@jon.than.ioE<gt>
 =head1 COPYRIGHT AND LICENCE
 
 (c) 2014-2015, Jonathan Wright E<lt>github@jon.than.ioE<gt>
+(c) 2021- PhiBo (DinoTools)
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
