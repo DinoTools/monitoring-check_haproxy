@@ -30,10 +30,10 @@ use warnings FATAL => 'all';
 use Carp;
 
 # Import Modules
-#use Getopt::Long qw(:config no_ignore_case);
 use POSIX;
 use Pod::Usage qw(pod2usage);
 use IO::Socket::UNIX qw( SOCK_STREAM );
+use LWP::UserAgent;
 use Data::Dumper;
 use Scalar::Util qw(looks_like_number);
 
@@ -189,7 +189,7 @@ sub main {
       usage     => "Usage: check_haproxy [--defaults (defaults)] [--overrides (override 1)]\n" .
                    "                     [--overrides (override 2)] [--overrides (override n)]\n" .
                    "                     [--[no]frontends] [--[no]backends] [--[no]servers]\n" .
-                   "                     [--socket (path)] [--help]",
+                   "                     [--socket (path|HTTP URI)] [--help]",
       version   => $_version,
       extra     => pod2scalar(),
   );
@@ -215,7 +215,7 @@ sub main {
   );
   $mp->add_arg(
     spec     => 'socket|S=s',
-    help     => 'Path to the socket check_haproxy should connect to',
+    help     => 'Path to the socket or HTTP URI check_haproxy should connect to',
     default  => '/var/run/haproxy.sock',
   );
   $mp->add_arg(
@@ -231,19 +231,30 @@ sub main {
 
   $mp->getopts;
 
-  my $socket = IO::Socket::UNIX->new(
-    Peer    => $mp->opts->socket,
-    Type    => SOCK_STREAM,
-    Timeout => 1,
-  ) or wrap_exit(
-    UNKNOWN,
-    sprintf(
-      'Cannot connect to socket %s',
-      $mp->opts->socket
-    )
-  );
+  my $fh;
+  if ($mp->opts->socket =~ /^http/) {
+    my $res = LWP::UserAgent->new()->get($mp->opts->socket);
+    $res->is_success or wrap_exit(UNKNOWN,
+      sprintf(
+        'Cannot connect to socket %s',
+        $mp->opts->socket
+      ));
+    open $fh, "<", \$res->content;
+  }
+  else {
+    $fh = IO::Socket::UNIX->new(
+      Peer    => $mp->opts->socket,
+      Type    => SOCK_STREAM,
+      Timeout => 1,
+    ) or wrap_exit(UNKNOWN,
+      sprintf(
+        'Cannot connect to socket %s',
+        $mp->opts->socket
+      ));
+    print $fh "show stat\n";
+  }
 
-  %data   = get_data($socket);
+  %data   = get_data($fh);
   %checks = build_checks(\@{$mp->opts->overrides});
 
   check_frontends() if $mp->opts->frontends;
@@ -299,7 +310,6 @@ sub get_data {
 
   _debug('get_data', 'is reading data from HAProxy');
 
-  print $s "show stat\n";
   while (<$s>) {
     chomp; next unless length;
     my @stat = split (',');
